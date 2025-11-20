@@ -51,7 +51,7 @@ system.get('/', async (req: Request, res: Response) => {
 });
 
 
-system.post('/reset', async (req: Request, res: Response) => {
+system.get('/reset', async (req: Request, res: Response) => {
   const g = await Game.deleteMany({})
   const p = await Player.deleteMany({})
   const l = await Lobby.deleteMany({})
