@@ -1,0 +1,30 @@
+import { Server } from 'socket.io';
+import { Server as HTTPServer } from 'http';
+
+
+let io: Server | null = null;
+
+
+export const initializeSocket = (httpServer: HTTPServer): Server => {
+  io = new Server(httpServer, {
+    cors: {
+      origin: process.env.CLIENT_URL || "http://localhost:5173",
+      methods: ["GET", "POST"],
+      credentials: true
+    },
+    transports: ['websocket', 'polling']
+  });
+
+  console.log('Socket.IO inicializado');
+  return io;
+};
+
+export const getIO = (): Server => {
+  if (!io) {
+    throw new Error('Socket.IO não foi inicializado! Chame initializeSocket primeiro.');
+  }
+  return io;
+};
+
+
+export default { initializeSocket, getIO };

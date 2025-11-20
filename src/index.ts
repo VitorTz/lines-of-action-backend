@@ -1,0 +1,52 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import 'dotenv/config';
+import system from './routes/system';
+import auth from './routes/auth';
+import { initializeSocket } from './socket/socket';
+import { createServer } from 'http';
+
+
+const app = express();
+const httpServer = createServer(app)
+const PORT = process.env.PORT!;
+const MONGODB_URI = process.env.MONGODB_URI!;
+
+
+async function startServer() {
+  if (!MONGODB_URI) {
+    console.error('Erro: MONGODB_URI não definida no .env');
+    process.exit(1);
+  }
+
+  try {
+    // Conectar ao MongoDB
+    await mongoose.connect(MONGODB_URI);
+    console.log('Conectado ao MongoDB com sucesso!');
+
+    const io = initializeSocket(httpServer)
+    
+    app.use(cors({  
+      origin: `http://localhost:${PORT}`,
+      credentials: true
+    }));
+
+    app.use(express.json());
+    app.use(cookieParser());
+    
+    app.use('/api/v1/system', system);
+    app.use('/api/v1/auth', auth);
+
+    app.listen(PORT, () => {
+      console.log(`Mongodb rodando na porta ${PORT}`);
+    });
+
+  } catch (error) {
+    console.error('Erro ao conectar ao MongoDB:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

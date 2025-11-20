@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+      "target": "ES2022",       // JavaScript moderno
+      "module": "commonjs",      // Padrão para Node.js
+      "outDir": "./dist",        // Onde o JS compilado irá
+      "rootDir": "./src",        // Onde nosso código TS está
+      "strict": true,            // Habilita checagens estritas
+      "esModuleInterop": true,   // Melhora a compatibilidade de módulos
+      "skipLibCheck": true,      // Pula a checagem de tipos em libs
+      "forceConsistentCasingInFileNames": true
+    },
+    "include": ["src/**/*"], // O que o TS deve compilar
+    "exclude": ["node_modules"] // O que o TS deve ignorar
+}
