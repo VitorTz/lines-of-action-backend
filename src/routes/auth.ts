@@ -71,7 +71,9 @@ const getUserResponse = (user: any) => ({
   id: user.id,
   username: user.username,
   email: user.email,
-  perfil_image_url: user.perfil_image_url,
+  perfilImageUrl: user.perfilImageUrl,
+  age: user.age,
+  address: user.address,
   createdAt: user.createdAt.toISOString()
 });
 
@@ -79,10 +81,19 @@ const getUserResponse = (user: any) => ({
 
 auth.post('/signup', async (req: Request, res: Response) => {
   try {
-    const { username, email, password } = req.body;
+    const { 
+      username, 
+      email, 
+      password, 
+      age,
+      perfilImageUrl, 
+      address
+    } = req.body;
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+    console.log(perfilImageUrl)
+
+    if (!username || !email || !password || !age || !address) {
+      return res.status(400).json({ error: 'Os campos username, email, password, age e address são obrigatórios' });
     }
 
     // Verificar se usuário já existe
@@ -98,7 +109,10 @@ auth.post('/signup', async (req: Request, res: Response) => {
     const user = new User({
       username,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      perfilImageUrl: perfilImageUrl ?? null,
+      age: age,
+      address: address
     });
 
     await user.save();
@@ -240,11 +254,12 @@ auth.post('/logout', async (req: Request, res: Response) => {
 // Atualizar perfil
 auth.put('/user/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { username, email } = req.body;
+    const { username, age, address } = req.body;
     const updateData: any = {};
 
     if (username) updateData.username = username;
-    if (email) updateData.email = email;
+    if (age) updateData.age = age
+    if (address) updateData.address = address
 
     const user = await User.findByIdAndUpdate(
       req.userId,
@@ -265,6 +280,38 @@ auth.put('/user/', authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Erro ao atualizar perfil' });
   }
 });
+
+
+auth.put('/user/profile/image', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { perfilImageUrl } = req.body
+
+    const updateData = {
+      perfilImageUrl: perfilImageUrl
+    }
+
+    console.log(req.body)
+    console.log(updateData)
+    
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+
+    res.json(getUserResponse(user));
+  } catch (error: any) {
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Erro ao atualizar imagem url' });
+    }
+    console.error('Erro ao atualizar imagem url:', error);
+    res.status(500).json({ error: 'Erro ao atualizar imagem' });
+  }
+})
 
 
 export default auth;

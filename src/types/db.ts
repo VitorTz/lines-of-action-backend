@@ -1,7 +1,7 @@
 
 
 export interface DBInfo {
-    
+
     status: string;
     name?: string;
     collections?: string[];
@@ -13,7 +13,7 @@ export interface DBInfo {
 
 
 export interface MemoryInfo {
-    
+
     rss: string
     heapTotal: string
     heapUsed: string

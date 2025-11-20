@@ -13,10 +13,10 @@ function createInitialBoard(): number[][] {
   const board = Array(8).fill(0).map(() => Array(8).fill(EMPTY));
 
   for (let i = 1; i <= 6; i++) {
-    board[0][i] = BLACK; // Fileira de cima (b8-g8)
-    board[7][i] = BLACK; // Fileira de baixo (b1-g1)
-    board[i][0] = WHITE; // Coluna da esquerda (a7-a2)
-    board[i][7] = WHITE; // Coluna da direita (h7-h2)
+    board[0][i] = BLACK;
+    board[7][i] = BLACK;
+    board[i][0] = WHITE;
+    board[i][7] = WHITE;
   }
   
   return board;
