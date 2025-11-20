@@ -84,14 +84,14 @@ const GameSchema = new Schema<IGame>({
     default: createInitialBoard 
   },
   
-  moveHistory: [MoveSchema],
+  moveHistory: { type: [MoveSchema], required: true, default: [] },
   
   winner: { type: Schema.Types.ObjectId, ref: 'User' },
   
 }, { timestamps: true  });
 
 
-
 const Game = mongoose.model<IGame>('Game', GameSchema);
+
 
 export default Game;

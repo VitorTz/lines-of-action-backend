@@ -68,7 +68,7 @@ export function playerHasAnyMove(board: number[][], player: 'black' | 'white'): 
         let rr = r + dr;
         let cc = c + dc;
         while (rr >= 0 && rr < rows && cc >= 0 && cc < cols) {
-          if (validateMove(board, { r, c }, { r: rr, c: cc }, player)) {
+          if (isValidMove(board, { r, c }, { r: rr, c: cc }, player)) {
             return true;
           }
           rr += dr;
@@ -81,7 +81,7 @@ export function playerHasAnyMove(board: number[][], player: 'black' | 'white'): 
   return false;
 }
 
-export function checkGameEnd(game: IGame): { status: GameStatus; winner: string | null } {
+export function checkEndGame(game: IGame): { status: GameStatus; winner: string | null } {
   const board = game.board
   
   // Verifica a vitória para ambos os jogadores
@@ -131,7 +131,7 @@ export function checkGameEnd(game: IGame): { status: GameStatus; winner: string 
 }
 
 
-export function validateMove(
+export function isValidMove(
   board: number[][],
   from: { r: number, c: number },
   to: { r: number, c: number },

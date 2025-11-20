@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { formatBytes, getDbStatus } from '../util';
 import { DBInfo, DBHealthCheck } from '../types/db';
+import Game from '../models/Game.model';
+import Player from '../models/Player.model';
+import { Lobby } from '../models/Lobby.model';
+import User from '../models/User.model';
 
 
 const system = Router();
@@ -45,5 +49,20 @@ system.get('/', async (req: Request, res: Response) => {
 
   res.status(200).json(healthCheck);
 });
+
+
+system.post('/reset', async (req: Request, res: Response) => {
+  const g = await Game.deleteMany({})
+  const p = await Player.deleteMany({})
+  const l = await Lobby.deleteMany({})
+  const u = await User.deleteMany({})
+
+  res.status(200).json({
+    "game": g.deletedCount,
+    "player": p.deletedCount,
+    "lobby": l.deletedCount,
+    "user": u.deletedCount
+  })
+})
 
 export default system;

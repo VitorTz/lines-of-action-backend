@@ -5,6 +5,8 @@ import cors from 'cors';
 import 'dotenv/config';
 import system from './routes/system';
 import auth from './routes/auth';
+import game from './routes/game';
+import lobby from './routes/lobby';
 import { initializeSocket } from './socket/socket';
 import { createServer } from 'http';
 
@@ -38,7 +40,9 @@ async function startServer() {
     
     app.use('/api/v1/system', system);
     app.use('/api/v1/auth', auth);
-
+    app.use('/api/v1/game', game);
+    app.use('/api/v1/lobby', lobby)
+    
     app.listen(PORT, () => {
       console.log(`Mongodb rodando na porta ${PORT}`);
     });
