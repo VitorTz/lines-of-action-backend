@@ -1,17 +1,22 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { Lobby } from '../models/Lobby.model';
 import Game from '../models/Game.model';
-
+import User from '../models/User.model';
+import { authenticate, AuthRequest } from '../security';
 
 const lobby = Router();
 
 
-lobby.post('/', async (req, res) => {
+lobby.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     try {
-        const { id, username, message } = req.body;
+        const { message } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({error: "not found", details: "usuário não encontrado"})
+        }
 
         const created = await Lobby.create({
-            host: { id, username },
+            host: { id: user.id, username: user.username },
             message: message ?? ''
         });
 
@@ -22,7 +27,7 @@ lobby.post('/', async (req, res) => {
 });
 
 
-lobby.get('/', async (req, res) => {
+lobby.get('/', async (req: Request, res: Response) => {
     try {
         const list = await Lobby.find({ status: 'waiting' }).sort({ createdAt: 1 });
         return res.json(list);
@@ -48,8 +53,8 @@ lobby.post('/:id/join', async (req, res) => {
 
         // Criar o jogo automaticamente
         const game = await Game.create({
-            playerBlack: lb.host!.id,    // host será sempre o jogador preto
-            playerWhite: lb.guest.id,   // guest = branco
+            playerBlack: lb.host!.id,
+            playerWhite: lb.guest.id,
             status: 'active',
             turn: 'black',
             board: Array(8).fill(null).map(() => Array(8).fill(0)),
