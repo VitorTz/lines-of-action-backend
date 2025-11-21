@@ -3,9 +3,8 @@ import mongoose from 'mongoose';
 import { formatBytes, getDbStatus } from '../util';
 import { DBInfo, DBHealthCheck } from '../types/db';
 import Game from '../models/Game.model';
-import Player from '../models/Player.model';
 import { Lobby } from '../models/Lobby.model';
-import User from '../models/User.model';
+import User, { getUserResponse } from '../models/User.model';
 
 
 const system = Router();
@@ -52,17 +51,34 @@ system.get('/', async (req: Request, res: Response) => {
 
 
 system.get('/reset', async (req: Request, res: Response) => {
+  
   const g = await Game.deleteMany({})
-  const p = await Player.deleteMany({})
   const l = await Lobby.deleteMany({})
   const u = await User.deleteMany({})
 
   res.status(200).json({
     "game": g.deletedCount,
-    "player": p.deletedCount,
     "lobby": l.deletedCount,
     "user": u.deletedCount
   })
 })
+
+
+system.get('/users', async (req: Request, res: Response) => {
+  try {
+    const users = await User.find().lean();
+
+    const result = users.map(u => getUserResponse(u));
+
+    res.status(200).json({
+      total: result.length,
+      users: result
+    });
+
+  } catch (err: any) {
+    console.error('Error fetching all users:', err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
 
 export default system;

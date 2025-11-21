@@ -65,5 +65,5 @@ export function verifyRefreshToken(refreshToken: any): { userId: string } {
 
 
 export async function comparePasswords(password1: string, password2: string): Promise<boolean> {
-    return await bcrypt.compare(password1, password1)
+    return await bcrypt.compare(password1, password2)
 }

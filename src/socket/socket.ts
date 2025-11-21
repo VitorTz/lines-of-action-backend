@@ -18,7 +18,6 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
 
   setupSocketEvents(io)
   
-  console.log('Socket.IO inicializado');
   return io;
 };
 

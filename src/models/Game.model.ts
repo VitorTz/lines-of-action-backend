@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { IPlayer } from './Player.model';
+import { IUser } from './User.model';
 
 
 export const EMPTY = 0;
@@ -49,13 +49,13 @@ const MoveSchema = new Schema<IMove>({
 
 
 export interface IGame extends Document {
-  playerBlack: IPlayer['_id'];
-  playerWhite: IPlayer['_id'];
+  playerBlack: IUser['_id'];
+  playerWhite: IUser['_id'];
   status: 'waiting' | 'active' | 'finished' | 'abandoned';
   turn: 'black' | 'white';  
   board: number[][]; // 8x8: 0 = Vazio, 1 = Preta, 2 = Branca
   moveHistory: IMove[];
-  winner?: IPlayer['_id'];
+  winner?: IUser['_id'];
   playerBlackSocketId: string
   playerBlackIsReady: boolean
   playerWhiteSocketId: string

@@ -1,9 +1,9 @@
 import { Schema, model, Document } from 'mongoose';
-import { IPlayer } from './Player.model';
+import { IUser } from './User.model';
 
 export interface ILobby extends Document {
-    host: { id: IPlayer['_id'], rank: number };
-    guest: { id: IPlayer['_id'], rank: number } | null;
+    host: { id: IUser['_id'], rank: number };
+    guest: { id: IUser['_id'], rank: number } | null;
     status: 'waiting' | 'full';
     message: string | null;
 }
@@ -12,7 +12,7 @@ const LobbySchema = new Schema<ILobby>({
     host: {
         id: {
             type: Schema.Types.ObjectId,
-            ref: 'Player',
+            ref: 'User',
             required: true,
         },
         rank: {
@@ -24,7 +24,7 @@ const LobbySchema = new Schema<ILobby>({
     guest: {
         id: {
             type: Schema.Types.ObjectId,
-            ref: 'Player',
+            ref: 'User',
             default: null,
         },
         rank: {

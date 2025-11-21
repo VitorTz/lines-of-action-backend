@@ -269,3 +269,15 @@ export const handleDisconnect = async (socket: Socket) => {
     console.error('Erro ao lidar com desconexão:', error);
   }
 };
+
+
+export async function handlePlayersOnLobby(socket: Socket) {
+  try {
+    const n = await lobbyQueue.size()
+    console.log("[SOCKET] [num-players-on-lobby] r:", n)
+    socket.emit('num-players-on-lobby', n)
+  } catch (error) {
+    console.error('Erro em handlePlayersOnLobby:', error);
+    socket.emit('error', { message: 'Erro ao cancelar' });
+  }
+}

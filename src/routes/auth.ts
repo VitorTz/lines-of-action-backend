@@ -75,19 +75,19 @@ auth.post('/login', async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+      return res.status(400).json({ error: 'Email e senha são obrigatórios.' });
     }
 
     // Buscar usuário
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
+      return res.status(401).json({ error: 'Credenciais inválidas, email não encontrado.' });
     }
 
-    // Verificar senha
+    // Verificar senha    
     const isValidPassword = await comparePasswords(password, user.password)
     if (!isValidPassword) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
+      return res.status(401).json({ error: 'Credenciais inválidas, senha incorreta.' });
     }
 
     // Gerar tokens

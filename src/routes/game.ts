@@ -29,7 +29,7 @@ game.get('/', async (req, res) => {
 });
 
 
-game.get('/math/history', authenticate, async (req: AuthRequest, res: Response) => {
+game.get('/match/history', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const id = req.userId
     const matches = await Game.find({

@@ -4,7 +4,8 @@ import {
   handleSetReady, 
   handleCancelLobby, 
   handleMatchFound, 
-  handleDisconnect 
+  handleDisconnect,
+  handlePlayersOnLobby
 } from './handlers/lobby';
 
 
@@ -15,6 +16,8 @@ export const setupSocketEvents = (io: Server) => {
     // Jogador entra na fila de lobby
     socket.on('join-lobby', (data) => handleJoinLobby(socket, data));
 
+    socket.on('num-players-on-lobby', (data) => handlePlayersOnLobby(socket));
+
     // Jogador confirma que recebeu a notificação de partida encontrada
     socket.on('match-found', (data) => handleMatchFound(socket, data));
 
@@ -23,6 +26,16 @@ export const setupSocketEvents = (io: Server) => {
 
     // Jogador cancela a busca/partida
     socket.on('cancel-lobby', () => handleCancelLobby(socket));
+
+    // Echo
+    socket.on('echo', (msg) => {
+      console.log("[SOCKET] [ECHO] ->", msg) 
+      socket.emit('echo', msg); 
+    });
+
+    socket.on("heartbeat", () => {
+      socket.emit("heartbeat-ack");
+    });
 
     // Jogador desconecta
     socket.on('disconnect', () => {

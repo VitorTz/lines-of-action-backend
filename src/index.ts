@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -7,19 +7,21 @@ import auth from './routes/auth';
 import game from './routes/game';
 import lobby from './routes/lobby';
 import image from './routes/image';
+import metrics from './routes/metrics';
 import { initializeSocket } from './socket/socket';
 import { createServer } from 'http';
 import { Constants } from './constants';
 import { existsSync } from 'fs';
 import fs from 'fs/promises';
 import 'dotenv/config';
+import { formatDateTimeBR } from './util';
 
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT;
-const MONGODB_URI = process.env.MONGODB_URI;
-const CLIENT_URL = process.env.CLIENT_URL;
+const PORT = process.env.PORT; // 3000
+const MONGODB_URI = process.env.MONGODB_URI; // mongodb://localhost:27017/linesdb
+const CLIENT_URL = process.env.CLIENT_URL; // http://localhost:5173
 const V = process.env.VERSION;
 
 
@@ -35,7 +37,6 @@ async function startServer() {
   
   try {
     await mongoose.connect(MONGODB_URI);
-    console.log('[Conectado ao MongoDB]');
     
     app.use(cors({  
       origin: CLIENT_URL,
@@ -44,8 +45,8 @@ async function startServer() {
     app.use(express.json());
     app.use(cookieParser());
     
-    // Inicialização do socket
-    const io = initializeSocket(httpServer);
+    // Inicialização do socket que lida com o lobby de partidas e jogos
+    initializeSocket(httpServer);
     
     // Rotas express
     app.use('/api/v1/system', system);
@@ -53,9 +54,10 @@ async function startServer() {
     app.use('/api/v1/game', game);
     app.use('/api/v1/lobby', lobby);
     app.use('/api/v1/image', image);
+    app.use('/api/v1/metrics', metrics);
     
     // Rota de teste
-    app.get('/health', (req, res) => {
+    app.get('/health', (req: Request, res: Response) => {
       res.json({ status: 'ok', version: V });
     });
     
@@ -65,6 +67,7 @@ async function startServer() {
       console.log(` Servidor Express: http://localhost:${PORT}`);
       console.log(` Socket.IO: ws://localhost:${PORT}`);
       console.log(` API REST: http://localhost:${PORT}/api/v1`);
+      console.log(" now:", formatDateTimeBR(new Date()))
       console.log("====================================");
     });
     
