@@ -10,6 +10,8 @@ export interface LobbyItem {
 }
 
 class LobbyQueue {
+
+  private playersSet = new Set<string>();
   private heap: LobbyItem[] = [];
 
   private compare(a: LobbyItem, b: LobbyItem) {
@@ -21,10 +23,29 @@ class LobbyQueue {
     [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
   }
 
-  async insert(item: LobbyItem): Promise<void> {
+  async hasPlayer(playerId: string): Promise<boolean> {
+    const release = await mutex.acquire()
+    try {
+      return this.playersSet.has(playerId)
+    } finally{
+      release()
+    }
+  }
+
+  async insert(item: LobbyItem) {
     const release = await mutex.acquire();
+
+    try {
+      if (this.playersSet.has(item.playerId)) {       
+        return
+      }
+    } finally {
+        release()
+    }
+
     try {
       this.heap.push(item);
+      this.playersSet.add(item.playerId)
       let i = this.heap.length - 1;
       while (i > 0) {
         const p = Math.floor((i - 1) / 2);
@@ -33,6 +54,10 @@ class LobbyQueue {
         i = p;
       }
     } finally {
+      console.log("==========")
+      this.heap.forEach(e => console.log(e))
+      console.log(this.playersSet)
+      console.log("==========")
       release();
     }
   }
@@ -72,7 +97,44 @@ class LobbyQueue {
         this.swap(i, largest);
         i = largest;
       }
+      this.playersSet.delete(top.playerId)
       return top;
+    } finally {
+      release();
+    }
+  }
+
+  async removeByPlayerId(playerId: string) {
+    const release = await mutex.acquire();
+    
+    try {
+      if (!this.playersSet.has(playerId)) {
+        return
+      }
+    } finally {
+      release()
+    }
+
+    try {
+      const index = this.heap.findIndex(item => item.playerId === playerId);
+      
+      if (index === -1) return null;
+      
+      const removed = this.heap[index];
+      
+      // Se for o último elemento, apenas remove
+      if (index === this.heap.length - 1) {
+        this.heap.pop();
+        return removed;
+      }
+      
+      // Substitui pelo último elemento
+      this.heap[index] = this.heap.pop()!;
+      
+      // Reordena o heap
+      this.heapify(index);
+      this.playersSet.delete(removed.playerId)
+      return removed;
     } finally {
       release();
     }
@@ -98,7 +160,7 @@ class LobbyQueue {
       
       // Reordena o heap
       this.heapify(index);
-      
+      this.playersSet.delete(removed.playerId)
       return removed;
     } finally {
       release();
@@ -145,6 +207,7 @@ class LobbyQueue {
         if (expired) removed.push(e);
         return !expired;
       });
+      removed.forEach(p => this.playersSet.delete(p.playerId))
     } finally {
       release();
     }
@@ -153,7 +216,11 @@ class LobbyQueue {
 
   async match(): Promise<{a: LobbyItem, b: LobbyItem} | null> {
     const a: LobbyItem | null = await this.removeTop();
-    const b: LobbyItem | null = await this.removeTop();
+    let b: LobbyItem | null = null
+
+    do {
+      b = await this.removeTop()
+    } while (a !== null && b !== null && b.playerId !== a.playerId)    
     
     if (!a || !b) {
       if (a) await this.insert(a);
@@ -164,13 +231,8 @@ class LobbyQueue {
     return {a, b};
   }
 
-  async size(): Promise<number> {
-    const release = await mutex.acquire();
-    try {
-      return this.heap.length;
-    } finally {
-      release();
-    }
+  size(): number {
+    return this.playersSet.size
   }
 
   async getAll(): Promise<LobbyItem[]> {

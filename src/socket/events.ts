@@ -25,7 +25,7 @@ export const setupSocketEvents = (io: Server) => {
     socket.on('set-ready', (data) => handleSetReady(socket, data));
 
     // Jogador cancela a busca/partida
-    socket.on('cancel-lobby', () => handleCancelLobby(socket));
+    socket.on('cancel-lobby', (data) => handleCancelLobby(socket, data));
 
     // Echo
     socket.on('echo', (msg) => {

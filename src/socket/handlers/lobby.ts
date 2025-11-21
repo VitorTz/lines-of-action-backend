@@ -3,36 +3,61 @@ import Game, { createInitialBoard } from '../../models/Game.model';
 import { getIO } from '../socket';
 import { lobbyQueue } from '../../LobbyQueue';
 import User from '../../models/User.model';
+import { Mutex } from 'async-mutex';
+
+const mutex = new Mutex();
 
 
 export const handleJoinLobby = async (socket: Socket, data: { playerId: string, rank: number }) => {
+
+  if (await lobbyQueue.hasPlayer(data.playerId)) {
+    socket.emit('error', { message: 'Você já está na fila' });
+    return
+  }
+  
   try {
-    console.log(`[id: ${data.playerId}] [rank: ${data.rank}] entrou no lobby`);
-    
+    console.log(socket.id, data)
+
     const gameExists = await Game.findOne({
       status: 'waiting',
       $or: [
-        { playerBlackSocketId: socket.id },
-        { playerWhiteSocketId: socket.id }
+        {playerBlack: data.playerId},
+        {playerWhite: data.playerId},
       ]
     });
 
     if (gameExists) {
+      if (gameExists.playerBlack == data.playerId) {
+        gameExists.playerBlackSocketId = socket.id
+      } else {
+        gameExists.playerWhiteSocketId = socket.id
+      }
+      gameExists.save()
       socket.emit('error', { message: 'Você já está esperando pelo começo de uma partida' });
       return;
     }
 
     await lobbyQueue.insert({
-      playerId: data.playerId, 
-      rank: data.rank, 
-      createdAt: Date.now(),
-      socketId: socket.id
-    });
+      playerId: data.playerId,
+      rank: data.rank,
+      socketId: socket.id,
+      createdAt: Date.now()
+    })
 
     // Vai tentar criar uma partida entre os dois jogadores com maior rank
     const match = await lobbyQueue.match();
     
     if (match) {
+      await Game.deleteMany({
+        status: "waiting",
+        $or: [
+          { playerBlack: match.a.playerId },
+          { playerWhite: match.a.playerId },
+          { playerBlack: match.b.playerId },
+          { playerWhite: match.b.playerId }
+        ]
+      });
+
       const newGame = await Game.create({
         playerBlack: match.a.playerId,
         playerWhite: match.b.playerId,
@@ -64,11 +89,13 @@ export const handleJoinLobby = async (socket: Socket, data: { playerId: string, 
       console.log(`Partida criada: ${newGame._id} - Black: ${match.a.playerId} vs White: ${match.b.playerId}`);
     } else {
       socket.emit('searching', { message: 'Procurando adversário...' });
+      socket.emit('num-players-on-lobby', await lobbyQueue.size());
     }
   } catch (error) {
     console.error('Erro ao entrar no lobby:', error);
     socket.emit('error', { message: 'Erro ao entrar no lobby' });
   }
+  
 };
 
 export const handleMatchFound = async (socket: Socket, data: { rank: number, gameId: string }) => {
@@ -182,10 +209,10 @@ export const handleSetReady = async (socket: Socket, data: { ready: boolean, gam
   }
 };
 
-export const handleCancelLobby = async (socket: Socket) => {
+export const handleCancelLobby = async (socket: Socket, data: { playerId: string }) => {
   try {
     // Remove o jogador da fila de espera
-    const removed = await lobbyQueue.removeBySocketId(socket.id);
+    const removed = await lobbyQueue.removeByPlayerId(data.playerId);
     
     if (removed) {
       socket.emit('lobby-cancelled', { message: 'Você saiu da fila de espera' });
