@@ -9,7 +9,7 @@ export const WHITE = 2;
 export type GameStatus = 'waiting' | 'active' | 'finished'
 
 
-function createInitialBoard(): number[][] {
+export function createInitialBoard(): number[][] {
   const board = Array(8).fill(0).map(() => Array(8).fill(EMPTY));
 
   for (let i = 1; i <= 6; i++) {
@@ -51,24 +51,61 @@ const MoveSchema = new Schema<IMove>({
 export interface IGame extends Document {
   playerBlack: IPlayer['_id'];
   playerWhite: IPlayer['_id'];
-  status: 'waiting' | 'active' | 'finished';
+  status: 'waiting' | 'active' | 'finished' | 'abandoned';
   turn: 'black' | 'white';  
   board: number[][]; // 8x8: 0 = Vazio, 1 = Preta, 2 = Branca
   moveHistory: IMove[];
   winner?: IPlayer['_id'];
+  playerBlackSocketId: string
+  playerBlackIsReady: boolean
+  playerWhiteSocketId: string
+  playerWhiteIsReady: boolean
   createdAt: Date;
   updatedAt: Date;
+  startedAt: Date;
+  endedAt: Date;
 }
 
 
 // Representa um jogo
 const GameSchema = new Schema<IGame>({
-  playerBlack: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  playerWhite: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  playerBlack: { 
+    type: Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+
+  playerBlackSocketId: {
+    type: String,
+    required: true
+  },
+
+  playerBlackIsReady: {
+    type: Boolean,
+    required: true,
+    default: false,
+  },
+
+  playerWhite: { 
+    type: Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+
+  playerWhiteIsReady: {
+    type: Boolean,
+    required: true,
+    default: false,
+  },
+
+  playerWhiteSocketId: {
+    type: String,
+    required: true    
+  },
   
   status: { 
     type: String, 
-    enum: ['waiting', 'active', 'finished'], 
+    enum: ['waiting', 'active', 'finished', 'abandoned'], 
     default: 'waiting' 
   },
   
@@ -87,6 +124,10 @@ const GameSchema = new Schema<IGame>({
   moveHistory: { type: [MoveSchema], required: true, default: [] },
   
   winner: { type: Schema.Types.ObjectId, ref: 'User' },
+  
+  startedAt: { type: Date },
+  
+  endedAt: { type: Date }
   
 }, { timestamps: true  });
 

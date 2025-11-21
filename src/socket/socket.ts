@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { Server as HTTPServer } from 'http';
+import { setupSocketEvents } from './events';
 
 
 let io: Server | null = null;
@@ -15,6 +16,8 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
     transports: ['websocket', 'polling']
   });
 
+  setupSocketEvents(io)
+  
   console.log('Socket.IO inicializado');
   return io;
 };

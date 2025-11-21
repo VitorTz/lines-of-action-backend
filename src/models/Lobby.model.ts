@@ -1,23 +1,52 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Document } from 'mongoose';
+import { IPlayer } from './Player.model';
 
+export interface ILobby extends Document {
+    host: { id: IPlayer['_id'], rank: number };
+    guest: { id: IPlayer['_id'], rank: number } | null;
+    status: 'waiting' | 'full';
+    message: string | null;
+}
 
-const LobbySchema = new Schema({
+const LobbySchema = new Schema<ILobby>({
     host: {
-        id: { type: String, required: true },
-        username: { type: String, required: true }
+        id: {
+            type: Schema.Types.ObjectId,
+            ref: 'Player',
+            required: true,
+        },
+        rank: {
+            type: Number,
+            required: true,
+        }
     },
+
     guest: {
-        id: { type: String, default: null },
-        username: { type: String, default: null }
+        id: {
+            type: Schema.Types.ObjectId,
+            ref: 'Player',
+            default: null,
+        },
+        rank: {
+            type: Number,
+            default: null,
+        }
     },
-    message: { type: String, default: '' },
+
     status: {
         type: String,
         enum: ['waiting', 'full'],
-        default: 'waiting'
+        default: 'waiting',
+        required: true,
     },
-    createdAt: { type: Date, default: Date.now }
+
+    message: {
+        type: String,
+        default: null,
+    }
+
+}, {
+    timestamps: true,
 });
 
-
-export const Lobby = model('Lobby', LobbySchema);
+export const Lobby = model<ILobby>('Lobby', LobbySchema);

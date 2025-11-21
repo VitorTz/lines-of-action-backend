@@ -1,191 +1,271 @@
 import { Socket } from 'socket.io';
-import Player from '../../models/Player.model';
-import Game, { IGame } from '../../models/Game.model';
+import Game, { createInitialBoard } from '../../models/Game.model';
 import { getIO } from '../socket';
+import { lobbyQueue } from '../../LobbyQueue';
+import User from '../../models/User.model';
 
 
-export const handleJoinLobby = async (socket: Socket, data: { username: string }) => {
+export const handleJoinLobby = async (socket: Socket, data: { playerId: string, rank: number }) => {
   try {
-    const player = await Player.findOneAndUpdate(
-      { socketId: socket.id },
-      { 
-        socketId: socket.id,
-        username: data.username,
-        status: 'online',
-        connectedAt: new Date()
-      },
-      { upsert: true, new: true }
-    );
+    console.log(`[id: ${data.playerId}] [rank: ${data.rank}] entrou no lobby`);
+    
+    const gameExists = await Game.findOne({
+      status: 'waiting',
+      $or: [
+        { playerBlackSocketId: socket.id },
+        { playerWhiteSocketId: socket.id }
+      ]
+    });
 
-    // Enviar lista de jogadores para o novo jogador
-    const allPlayers = await Player.find({ socketId: { $ne: socket.id } });
-    socket.emit('lobby-players', allPlayers);
+    if (gameExists) {
+      socket.emit('error', { message: 'Você já está esperando pelo começo de uma partida' });
+      return;
+    }
 
-    // Notificar todos sobre o novo jogador
-    socket.broadcast.emit('player-joined', player);
+    await lobbyQueue.insert({
+      playerId: data.playerId, 
+      rank: data.rank, 
+      createdAt: Date.now(),
+      socketId: socket.id
+    });
 
-    console.log(`${data.username} entrou no lobby`);
+    // Vai tentar criar uma partida entre os dois jogadores com maior rank
+    const match = await lobbyQueue.match();
+    
+    if (match) {
+      const newGame = await Game.create({
+        playerBlack: match.a.playerId,
+        playerWhite: match.b.playerId,
+        playerBlackSocketId: match.a.socketId,
+        playerWhiteSocketId: match.b.socketId,
+        playerBlackIsReady: false,
+        playerWhiteIsReady: false,
+        status: 'waiting'
+      });
+
+      const io = getIO();
+      
+      // Envia notificação de partida encontrada para o jogador Black
+      io.to(match.a.socketId).emit('match-found', {
+        gameId: newGame.id,
+        yourColor: 'black',
+        opponentRank: match.b.rank,
+        yourRank: match.a.rank
+      });
+
+      // Envia notificação de partida encontrada para o jogador White
+      io.to(match.b.socketId).emit('match-found', {
+        gameId: newGame.id,
+        yourColor: 'white',
+        opponentRank: match.a.rank,
+        yourRank: match.b.rank
+      });
+
+      console.log(`Partida criada: ${newGame._id} - Black: ${match.a.playerId} vs White: ${match.b.playerId}`);
+    } else {
+      socket.emit('searching', { message: 'Procurando adversário...' });
+    }
   } catch (error) {
     console.error('Erro ao entrar no lobby:', error);
     socket.emit('error', { message: 'Erro ao entrar no lobby' });
   }
 };
 
-export const handleSetReady = async (socket: Socket, ready: boolean) => {
+export const handleMatchFound = async (socket: Socket, data: { rank: number, gameId: string }) => {
   try {
-    const player = await Player.findOneAndUpdate(
-      { socketId: socket.id },
-      { status: ready ? 'ready' : 'online' },
-      { new: true }
-    );
+    console.log('Match found acknowledgment:', data);
+    
+    const game = await Game.findById(data.gameId);
+    
+    if (!game) {
+      socket.emit('error', { message: 'Partida não encontrada' });
+      return;
+    }
 
-    if (player) {
+    // Confirma que o jogador recebeu a notificação de partida
+    const io = getIO();
+    const isBlack = socket.id === game.playerBlackSocketId;
+    const opponentSocketId = isBlack ? game.playerWhiteSocketId : game.playerBlackSocketId;
+
+    io.to(opponentSocketId).emit('opponent-connected', {
+      message: 'Seu oponente está pronto para começar'
+    });
+  } catch (error) {
+    console.error('Erro no handleMatchFound:', error);
+    socket.emit('error', { message: 'Erro ao encontrar partida' });
+  }
+};
+
+export const handleSetReady = async (socket: Socket, data: { ready: boolean, gameId: string }) => {
+  try {
+    const game = await Game.findOne({
+      _id: data.gameId,
+      status: 'waiting',
+      $or: [
+        { playerBlackSocketId: socket.id },
+        { playerWhiteSocketId: socket.id }
+      ]
+    });
+
+    if (!game) {
+      socket.emit('error', { message: 'Você não faz parte de nenhum jogo em andamento' });  
+      return;
+    }
+
+    const io = getIO();
+    const isBlack = socket.id === game.playerBlackSocketId;
+    const opponentSocketId = isBlack ? game.playerWhiteSocketId : game.playerBlackSocketId;
+
+    // Atualiza o status de ready do jogador
+    if (isBlack) {
+      game.playerBlackIsReady = data.ready;
+    } else {
+      game.playerWhiteIsReady = data.ready;
+    }
+
+    await game.save();
+
+    // Notifica o oponente sobre a mudança de status
+    io.to(opponentSocketId).emit('opponent-ready-status', {
+      isReady: data.ready
+    });
+
+    // Notifica o próprio jogador
+    socket.emit('ready-status-updated', {
+      isReady: data.ready
+    });
+
+    // Se ambos estão prontos, inicia o jogo
+    if (game.playerBlackIsReady && game.playerWhiteIsReady) {
+      game.status = 'active';
+      game.startedAt = new Date();
+      await game.save();
+
+      // Busca informações dos jogadores
+      const [playerBlack, playerWhite] = await Promise.all([
+        User.findById(game.playerBlack),
+        User.findById(game.playerWhite)
+      ]);
+
+      if (!playerBlack || !playerWhite) {
+        console.log("não foram encontrados todos os jogadores para iniciar a partida")
+        socket.emit('error', { message: 'Erro ao encontrar os jogadores' });
+        return
+      }
+
+      const gameData = {
+        gameId: game.id,
+        playerBlack: {
+          id: playerBlack.id,
+          name: playerBlack.username,
+          rank: playerBlack.rank
+        },
+        playerWhite: {
+          id: playerWhite.id,
+          name: playerWhite.username,
+          rank: playerWhite.rank
+        },
+        board: createInitialBoard(),
+        currentTurn: 'black',
+        startedAt: game.startedAt
+      };
+
+      // Notifica ambos os jogadores que o jogo começou
+      io.to(game.playerBlackSocketId).emit('game-started', gameData);
+      io.to(game.playerWhiteSocketId).emit('game-started', gameData);
+
+      console.log(`Jogo iniciado: ${game._id}`);
+    }
+  } catch (error) {
+    console.error('Erro ao definir ready:', error);
+    socket.emit('error', { message: 'Erro ao definir status de pronto' });
+  }
+};
+
+export const handleCancelLobby = async (socket: Socket) => {
+  try {
+    // Remove o jogador da fila de espera
+    const removed = await lobbyQueue.removeBySocketId(socket.id);
+    
+    if (removed) {
+      socket.emit('lobby-cancelled', { message: 'Você saiu da fila de espera' });
+      console.log(`Jogador ${removed.playerId} saiu da fila`);
+      return;
+    }
+
+    // Se não está na fila, verifica se está em uma partida esperando
+    const game = await Game.findOne({
+      status: 'waiting',
+      $or: [
+        { playerBlackSocketId: socket.id },
+        { playerWhiteSocketId: socket.id }
+      ]
+    });
+
+    if (game) {
       const io = getIO();
-      io.emit('player-status-changed', player);
+      const isBlack = socket.id === game.playerBlackSocketId;
+      const opponentSocketId = isBlack ? game.playerWhiteSocketId : game.playerBlackSocketId;
+
+      // Notifica o oponente que a partida foi cancelada
+      io.to(opponentSocketId).emit('match-cancelled', {
+        message: 'Seu oponente cancelou a partida'
+      });
+
+      // Deleta o jogo
+      await Game.deleteOne({ _id: game._id });
+
+      socket.emit('lobby-cancelled', { message: 'Você cancelou a partida' });
+      console.log(`Partida ${game._id} cancelada por ${isBlack ? 'Black' : 'White'}`);
     }
   } catch (error) {
-    console.error('Erro ao atualizar status:', error);
+    console.error('Erro ao cancelar lobby:', error);
+    socket.emit('error', { message: 'Erro ao cancelar' });
   }
 };
 
-export const handleChallengePlayer = async (socket: Socket, data: { targetSocketId: string }) => {
+
+export const handleDisconnect = async (socket: Socket) => {
   try {
-    const io = getIO();
-    const challenger = await Player.findOne({ socketId: socket.id });
-    const target = await Player.findOne({ socketId: data.targetSocketId });
+    // Remove da fila se estiver esperando
+    await lobbyQueue.removeBySocketId(socket.id);
 
-    if (!challenger || !target) {
-      socket.emit('error', { message: 'Jogador não encontrado' });
-      return;
-    }
-
-    if (target.status === 'in-game') {
-      socket.emit('error', { message: 'Jogador já está em uma partida' });
-      return;
-    }
-
-    // Criar jogo
-    const gameId = `game-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    await Game.create({
-      gameId,
-      player1: {
-        socketId: challenger.socketId,
-        username: challenger.username
-      },
-      player2: {
-        socketId: target.socketId,
-        username: target.username
-      },
-      status: 'active'
+    // Verifica se está em uma partida
+    const game = await Game.findOne({
+      status: { $in: ['waiting', 'active'] },
+      $or: [
+        { playerBlackSocketId: socket.id },
+        { playerWhiteSocketId: socket.id }
+      ]
     });
 
-    // Atualizar status dos jogadores
-    await Player.updateMany(
-      { socketId: { $in: [socket.id, data.targetSocketId] } },
-      { status: 'in-game', gameId }
-    );
+    if (game) {
+      const io = getIO();
+      const isBlack = socket.id === game.playerBlackSocketId;
+      const opponentSocketId = isBlack ? game.playerWhiteSocketId : game.playerBlackSocketId;
 
-    // Fazer ambos os jogadores entrarem na sala do jogo
-    socket.join(gameId);
-    io.sockets.sockets.get(data.targetSocketId)?.join(gameId);
+      if (game.status === 'waiting') {
+        // Se estava esperando, cancela a partida
+        io.to(opponentSocketId).emit('match-cancelled', {
+          message: 'Seu oponente se desconectou'
+        });
+        await Game.deleteOne({ _id: game._id });
+      } else if (game.status === 'active') {
+        // Se estava jogando, marca como abandonada
+        game.status = 'abandoned';
+        game.winner = isBlack ? game.playerWhite : game.playerBlack;
+        game.endedAt = new Date();
+        await game.save();
 
-    // Notificar ambos os jogadores sobre o início do jogo
-    io.to(gameId).emit('game-started', {
-      gameId,
-      player1: {
-        socketId: challenger.socketId,
-        username: challenger.username
-      },
-      player2: {
-        socketId: target.socketId,
-        username: target.username
-      }
-    });
-
-    // Atualizar lista de jogadores para todos no lobby
-    const updatedPlayers = await Player.find();
-    io.emit('lobby-players-update', updatedPlayers);
-
-    console.log(`Jogo iniciado: ${gameId}`);
-  } catch (error) {
-    console.error('Erro ao criar jogo:', error);
-    socket.emit('error', { message: 'Erro ao iniciar jogo' });
-  }
-};
-
-export const handleRequestPlayers = async (socket: Socket) => {
-  try {
-    const players = await Player.find();
-    socket.emit('lobby-players', players);
-  } catch (error) {
-    console.error('Erro ao buscar jogadores:', error);
-  }
-};
-
-
-export const handleLeaveGame = async (socket: Socket) => {
-  try {
-    const io = getIO();
-    const player = await Player.findOne({ socketId: socket.id });
-    
-    if (player && player.gameId) {
-      const gameId = player.gameId;
-      
-      // Atualizar status do jogador
-      await Player.findOneAndUpdate(
-        { socketId: socket.id },
-        { status: 'online', gameId: null }
-      );
-
-      // Sair da sala do jogo
-      socket.leave(gameId);
-
-      // Atualizar lista para todos
-      const updatedPlayers = await Player.find();
-      io.emit('lobby-players-update', updatedPlayers);
-
-      console.log(`Jogador ${player.username} saiu do jogo ${gameId}`);
-    }
-  } catch (error) {
-    console.error('Erro ao sair do jogo:', error);
-  }
-};
-
-
-export const handleGameDisconnect = async (socket: Socket) => {
-  try {
-    const io = getIO();
-    const player = await Player.findOne({ socketId: socket.id });
-    
-    if (player) {
-      // Se estava em jogo, notificar o outro jogador
-      if (player.gameId) {
-        const game: IGame | any = await Game.findOne({ gameId: player.gameId });
-        if (game) {
-          const otherPlayerSocketId = game.player1.socketId === socket.id 
-            ? game.player2.socketId 
-            : game.player1.socketId;
-          
-          io.to(otherPlayerSocketId).emit('opponent-disconnected');
-          
-          // Atualizar status do outro jogador
-          await Player.findOneAndUpdate(
-            { socketId: otherPlayerSocketId },
-            { status: 'online', gameId: null }
-          );
-        }
+        io.to(opponentSocketId).emit('opponent-disconnected', {
+          message: 'Seu oponente se desconectou. Você venceu!',
+          gameId: game.id
+        });
       }
 
-      // Remover jogador do banco
-      await Player.deleteOne({ socketId: socket.id });
-
-      // Notificar todos sobre a saída
-      socket.broadcast.emit('player-left', socket.id);
-
-      console.log(`${player.username} desconectou`);
+      console.log(`Jogador desconectado da partida ${game._id}`);
     }
   } catch (error) {
-    console.error('Erro ao desconectar:', error);
+    console.error('Erro ao lidar com desconexão:', error);
   }
 };

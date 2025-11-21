@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import User from '../models/User.model'
+import User, { getUserResponse } from '../models/User.model'
 import RefreshToken from '../models/RefreshToken.model';
 import bcrypt from 'bcryptjs';
 import 'dotenv/config';
@@ -15,17 +15,6 @@ import {
 
 
 const auth = Router();
-
-
-const getUserResponse = (user: any) => ({
-  id: user.id,
-  username: user.username,
-  email: user.email,
-  perfilImageUrl: user.perfilImageUrl,
-  age: user.age,
-  address: user.address,
-  createdAt: user.createdAt.toISOString()
-});
 
 
 auth.post('/signup', async (req: Request, res: Response) => {
