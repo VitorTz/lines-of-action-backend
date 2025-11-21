@@ -26,3 +26,4 @@ export function getDbStatus(connection: Connection): string {
             return 'unknown';
     }
 };
+

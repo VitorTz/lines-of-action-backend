@@ -1,70 +1,20 @@
 import { Router, Request, Response } from 'express';
 import User from '../models/User.model'
 import RefreshToken from '../models/RefreshToken.model';
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { NextFunction } from 'express';
 import 'dotenv/config';
-
-
-const JWT_SECRET = process.env.JWT_SECRET!
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
-const ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS = parseInt(process.env.ACCESS_TOKEN_EXPIRE_TIME_IN_MINUTES || '900000')
-const REFRESH_TOKEN_EXPIRE_TIME_IN_MILLISECONDS = parseInt(process.env.REFRESH_TOKEN_EXPIRE_TIM_IN_DAYS || '2592000000')
+import { 
+  authenticate, 
+  generateAccessToken, 
+  generateRefreshToken, 
+  setTokenCookies, 
+  AuthRequest, 
+  verifyRefreshToken,
+  comparePasswords
+} from '../security';
 
 
 const auth = Router();
-
-
-interface AuthRequest extends Request {
-
-  userId?: string;
-
-}
-
-
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const token = req.cookies.accessToken;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    req.userId = decoded.userId;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Token inválido ou expirado' });
-  }
-};
-
-
-const generateAccessToken = (userId: string): string => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS });
-};
-
-
-const generateRefreshToken = (userId: string): string => {
-  return jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRE_TIME_IN_MILLISECONDS });
-};
-
-
-const setTokenCookies = (res: Response, accessToken: string, refreshToken: string) => {
-  res.cookie('accessToken', accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS
-  });
-
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: REFRESH_TOKEN_EXPIRE_TIME_IN_MILLISECONDS
-  });
-};
 
 
 const getUserResponse = (user: any) => ({
@@ -78,7 +28,6 @@ const getUserResponse = (user: any) => ({
 });
 
 
-
 auth.post('/signup', async (req: Request, res: Response) => {
   try {
     const { 
@@ -86,11 +35,8 @@ auth.post('/signup', async (req: Request, res: Response) => {
       email, 
       password, 
       age,
-      perfilImageUrl, 
       address
-    } = req.body;
-
-    console.log(perfilImageUrl)
+    } = req.body;    
 
     if (!username || !email || !password || !age || !address) {
       return res.status(400).json({ error: 'Os campos username, email, password, age e address são obrigatórios' });
@@ -100,7 +46,7 @@ auth.post('/signup', async (req: Request, res: Response) => {
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       return res.status(400).json({ error: 'Email ou username já cadastrado' });
-    }
+    }    
 
     // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -110,7 +56,6 @@ auth.post('/signup', async (req: Request, res: Response) => {
       username,
       email,
       password: hashedPassword,
-      perfilImageUrl: perfilImageUrl ?? null,
       age: age,
       address: address
     });
@@ -151,7 +96,7 @@ auth.post('/login', async (req: Request, res: Response) => {
     }
 
     // Verificar senha
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const isValidPassword = await comparePasswords(password, user.password)
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
@@ -161,7 +106,10 @@ auth.post('/login', async (req: Request, res: Response) => {
     const refreshToken = generateRefreshToken(user.id);
 
     // Salvar refresh token
-    await new RefreshToken({ userId: user._id, token: refreshToken }).save();
+    await new RefreshToken({ 
+      userId: user._id, 
+      token: refreshToken 
+    }).save();
 
     // Setar cookies
     setTokenCookies(res, accessToken, refreshToken);
@@ -188,6 +136,7 @@ auth.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+
 // Renovar token
 auth.post('/refresh', async (req: Request, res: Response) => {
   try {
@@ -204,7 +153,7 @@ auth.post('/refresh', async (req: Request, res: Response) => {
     }
 
     // Verificar token
-    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { userId: string };
+    const decoded = verifyRefreshToken(refreshToken)
 
     // Buscar usuário
     const user = await User.findById(decoded.userId);
@@ -288,10 +237,7 @@ auth.put('/user/profile/image', authenticate, async (req: AuthRequest, res: Resp
 
     const updateData = {
       perfilImageUrl: perfilImageUrl
-    }
-
-    console.log(req.body)
-    console.log(updateData)
+    }    
     
     const user = await User.findByIdAndUpdate(
       req.userId,

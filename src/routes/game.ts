@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router, Response, Request } from 'express';
 import Game, { BLACK, WHITE } from '../models/Game.model';
 import { isValidMove, checkEndGame } from '../service/game.logic';
+import { authenticate, AuthRequest } from '../security';
 
 
 const game = Router();
@@ -25,6 +26,26 @@ game.get('/', async (req, res) => {
     } catch (err) {
         return res.status(500).json({ error: 'Internal error', details: err });
     }
+});
+
+
+game.get('/math/history', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.userId
+    const matches = await Game.find({
+        $or: [
+            { playerBlack: id }, 
+            { playerWhite: id }
+        ]
+    })
+        .sort({ createdAt: -1 })
+        .exec();
+
+    return res.json(matches);
+  } catch (error) {
+    console.error('Erro ao buscar usuário:', error);
+    res.status(500).json({ error: 'Erro ao buscar usuário' });
+  }
 });
 
 // Criar novo jogo

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs/promises';
-import { existsSync, createWriteStream } from 'fs';
+import { createWriteStream } from 'fs';
 import crypto from 'crypto';
 import busboy from 'busboy';
 import { Constants } from '../constants';
@@ -155,7 +155,6 @@ const processUpload = (req: UploadRequest, res: Response, next: NextFunction): v
 // POST - Upload de imagem (somente admin)
 image.post('/upload', processUpload, async (req: UploadRequest, res: Response): Promise<void> => {
   try {
-    console.log("112")
     if (!req.uploadedFiles || req.uploadedFiles.length === 0) {
       res.status(400).json({ error: 'Nenhuma imagem foi enviada' });
       return;
