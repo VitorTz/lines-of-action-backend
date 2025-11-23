@@ -10,8 +10,10 @@ import {
   handleGameDisconnect, 
   handleMakeMove, 
   handleGameOver, 
-  handleSurrender 
+  handleSurrender,
+  handleGameChatMessage
 } from './handlers/gameHandler';
+import { handleVideoSignal } from './handlers/videoHandler';
 
 
 export const setupSocketEvents = (io: Server) => {
@@ -39,6 +41,12 @@ export const setupSocketEvents = (io: Server) => {
       
       // Jogador desiste
       socket.on('surrender', (data) => handleSurrender(socket, data));
+
+    // [GAME CHAT]
+      socket.on('send-game-message', (data) => handleGameChatMessage(socket, data));
+
+    // [VIDEO CHAT]
+      socket.on('video-signal', (data) => handleVideoSignal(socket, data));
 
     // [UTIL]
       // Echo

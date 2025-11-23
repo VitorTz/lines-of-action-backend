@@ -271,3 +271,38 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
     socket.emit('error', { message: 'Erro ao desistir' });
   }
 };
+
+export const handleGameChatMessage = async (socket: Socket, data: { gameId: string, message: string, playerId: string }) => {
+  try {
+    const game = await Game.findById(data.gameId);
+    
+    if (!game) return;
+
+    const io = getIO();
+    let opponentSocketId: string | null = null;
+
+    // Identifica quem mandou e quem deve receber
+    if (socket.id === game.playerBlackSocketId) {
+      opponentSocketId = game.playerWhiteSocketId;
+    } else if (socket.id === game.playerWhiteSocketId) {
+      opponentSocketId = game.playerBlackSocketId;
+    }
+
+    const messageData = {
+      senderId: data.playerId,
+      text: data.message,
+      timestamp: Date.now()
+    };
+
+    // Envia para o oponente
+    if (opponentSocketId) {
+      io.to(opponentSocketId).emit('game-chat-message', messageData);
+    }
+    
+    // Envia de volta para quem mandou (confirmação/echo) para garantir sincronia
+    socket.emit('game-chat-message', messageData);
+
+  } catch (error) {
+    console.error('Erro no chat do jogo:', error);
+  }
+};
