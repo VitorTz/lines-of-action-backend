@@ -49,6 +49,7 @@ const MoveSchema = new Schema<IMove>({
 
 
 export interface IGame extends Document {
+
   playerBlack: IUser['_id'];
   playerWhite: IUser['_id'];
   status: 'waiting' | 'active' | 'finished' | 'abandoned';
@@ -64,6 +65,7 @@ export interface IGame extends Document {
   updatedAt: Date;
   startedAt: Date;
   endedAt: Date;
+  
 }
 
 

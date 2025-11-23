@@ -1,46 +1,60 @@
 import { Server, Socket } from 'socket.io';
 import { 
-  handleJoinLobby, 
-  handleSetReady, 
-  handleCancelLobby, 
-  handleMatchFound, 
-  handleDisconnect,
-  handlePlayersOnLobby
-} from './handlers/lobby';
+  handleJoinGameQueue, 
+  handleMatchAccepted,
+  handleExitQueue,
+  handleQueueDisconnect  
+} from './handlers/gameQueue';
+import { 
+  handleJoinGame, 
+  handleGameDisconnect, 
+  handleMakeMove, 
+  handleGameOver, 
+  handleSurrender 
+} from './handlers/gameHandler';
 
 
 export const setupSocketEvents = (io: Server) => {
   io.on('connection', (socket: Socket) => {
     console.log(`Cliente conectado. SocketId: ${socket.id}`);
 
-    // Jogador entra na fila de lobby
-    socket.on('join-lobby', (data) => handleJoinLobby(socket, data));
+    // [QUEUE]
+      // Jogador entra na fila
+      socket.on('join-queue', (data) => handleJoinGameQueue(socket, data));
 
-    socket.on('num-players-on-lobby', (data) => handlePlayersOnLobby(socket));
+      // Jogador diz que está pronto para começar uma partida
+      socket.on('match-ready', (data) => handleMatchAccepted(socket, data));
 
-    // Jogador confirma que recebeu a notificação de partida encontrada
-    socket.on('match-found', (data) => handleMatchFound(socket, data));
+      // Jogador sai do lobby
+      socket.on('exit-queue', (data) => handleExitQueue(socket, data));
 
-    // Jogador define se está pronto para começar
-    socket.on('set-ready', (data) => handleSetReady(socket, data));
+    // [GAME]
+      socket.on('join-game', (data) => handleJoinGame(socket, data));
+    
+      // Jogador faz um movimento
+      socket.on('make-move', (data) => handleMakeMove(socket, data));
+      
+      // Notificação de fim de jogo
+      socket.on('game-over', (data) => handleGameOver(socket, data));
+      
+      // Jogador desiste
+      socket.on('surrender', (data) => handleSurrender(socket, data));
 
-    // Jogador cancela a busca/partida
-    socket.on('cancel-lobby', (data) => handleCancelLobby(socket, data));
+    // [UTIL]
+      // Echo
+      socket.on('echo', (msg) => {
+        console.log("[SOCKET] [ECHO] ->", msg) 
+        socket.emit('echo', msg); 
+      });
 
-    // Echo
-    socket.on('echo', (msg) => {
-      console.log("[SOCKET] [ECHO] ->", msg) 
-      socket.emit('echo', msg); 
-    });
+      socket.on("heartbeat", () => { socket.emit("heartbeat-ack"); });
 
-    socket.on("heartbeat", () => {
-      socket.emit("heartbeat-ack");
-    });
+      // Jogador desconecta
+      socket.on('disconnect', () => {
+        console.log(`Cliente desconectado. SocketId: ${socket.id}`);
+        handleQueueDisconnect(socket);
+        handleGameDisconnect(socket);
+      });
 
-    // Jogador desconecta
-    socket.on('disconnect', () => {
-      console.log(`Cliente desconectado. SocketId: ${socket.id}`);
-      handleDisconnect(socket);
-    });
   });
 };

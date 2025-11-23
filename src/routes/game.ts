@@ -6,27 +6,22 @@ import { authenticate, AuthRequest } from '../security';
 
 const game = Router();
 
-// Busca jogos por status e/ou Jogador
-// body: { status, player }
-game.get('/', async (req, res) => {
+
+game.get('/', async (req: Request, res: Response) => {
     try {
-        const { status, player } = req.query;
+        const { gameId } = req.query;
 
-        const filter: any = {};
+        if (!gameId) {
+            return res.status(400).json({ error: 'gameId is required' });
+        }
 
-        if (status) filter.status = status;
-        if (player) filter.$or = [
-            { 'players.black': player },
-            { 'players.white': player }
-        ];
-
-        const games = await Game.find(filter);
-        return res.json(games);
-
+        const game = await Game.findById(gameId);
+        return res.json(game);
     } catch (err) {
         return res.status(500).json({ error: 'Internal error', details: err });
     }
 });
+
 
 
 game.get('/match/history', authenticate, async (req: AuthRequest, res: Response) => {

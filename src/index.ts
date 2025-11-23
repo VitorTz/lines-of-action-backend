@@ -15,6 +15,7 @@ import { existsSync } from 'fs';
 import fs from 'fs/promises';
 import 'dotenv/config';
 import { formatDateTimeBR } from './util';
+import Game from './models/Game.model';
 
 
 const app = express();
@@ -60,6 +61,8 @@ async function startServer() {
     app.get('/health', (req: Request, res: Response) => {
       res.json({ status: 'ok', version: V });
     });
+
+    Game.deleteMany({})
     
     httpServer.listen(PORT, () => {
       console.log("====================================");
