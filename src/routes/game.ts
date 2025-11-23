@@ -23,25 +23,80 @@ game.get('/', async (req: Request, res: Response) => {
 });
 
 
-
 game.get('/match/history', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const id = req.userId
-    const matches = await Game.find({
-        $or: [
-            { playerBlack: id }, 
-            { playerWhite: id }
-        ]
-    })
-        .sort({ createdAt: -1 })
-        .exec();
+    try {
+        const id = req.userId;
 
-    return res.json(matches);
-  } catch (error) {
-    console.error('Erro ao buscar usuário:', error);
-    res.status(500).json({ error: 'Erro ao buscar usuário' });
-  }
+        const matches = await Game.find({
+            $or: [
+                { playerBlack: id },
+                { playerWhite: id }
+            ],
+            status: 'finished'
+        })
+            .populate('playerBlack')
+            .populate('playerWhite')
+            .populate('winner')
+            .sort({ createdAt: -1 })
+            .exec();
+
+        const result = matches.map(match => ({
+            gameId: match.id,
+            playerBlack: match.playerBlack,
+            playerWhite: match.playerWhite,
+            winner: match.winner || null,
+            gameCreatedAt: match.createdAt,
+            gameUpdatedAt: match.updatedAt,
+            gameNumMoves: match.moveHistory.length,
+            gameMoves: match.moveHistory
+        }));
+
+        return res.json(result);
+
+    } catch (error) {
+        console.error('Erro ao buscar partidas:', error);
+        return res.status(500).json({ error: 'Erro ao buscar partidas' });
+    }
 });
+
+
+game.get('/match/history/one', async (req, res) => {
+    try {
+
+        const { gameId } = req.query
+        
+        console.log("gameId", gameId)
+
+        const game = await Game.findById(gameId)
+            .populate('playerBlack')
+            .populate('playerWhite')
+            .populate('winner')
+            .sort({ createdAt: -1 })
+            .exec();
+
+        if (!game) {
+            return res.status(404).json({ error: "Partida não encontrada" })
+        }
+
+        const result = {
+            gameId: game.id,
+            playerBlack: game.playerBlack,
+            playerWhite: game.playerWhite,
+            winner: game.winner || null,
+            gameCreatedAt: game.createdAt,
+            gameUpdatedAt: game.updatedAt,
+            gameNumMoves: game.moveHistory.length,
+            gameMoves: game.moveHistory
+        }
+
+        return res.json(result);
+
+    } catch (error) {
+        console.error('Erro ao buscar partidas:', error);
+        return res.status(500).json({ error: 'Erro ao buscar partidas' });
+    }
+})
+
 
 // Criar novo jogo
 // body: { playerBlack, playerWhite }

@@ -5,8 +5,8 @@ import bcrypt from 'bcryptjs';
 
 const JWT_SECRET = process.env.JWT_SECRET!
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!
-const ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS = parseInt(process.env.ACCESS_TOKEN_EXPIRE_TIME_IN_MINUTES || '900000')
-const REFRESH_TOKEN_EXPIRE_TIME_IN_MILLISECONDS = parseInt(process.env.REFRESH_TOKEN_EXPIRE_TIM_IN_DAYS || '2592000000')
+const ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS = parseInt(process.env.ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS || '1000000000')
+const REFRESH_TOKEN_EXPIRE_TIME_IN_MILLISECONDS = parseInt(process.env.REFRESH_TOKEN_EXPIRE_TIME_IN_MILLISECONDS || '2592000000')
 
 
 export interface AuthRequest extends Request {
@@ -33,7 +33,9 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
 
 export const generateAccessToken = (userId: string): string => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS });
+  return jwt.sign({ userId }, JWT_SECRET, { 
+    expiresIn: ACCESS_TOKEN_EXPIRE_TIME_IN_MILLISECONDS 
+  });
 };
 
 
