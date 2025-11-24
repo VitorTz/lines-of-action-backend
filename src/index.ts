@@ -23,7 +23,7 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT; // 3000
 const MONGODB_URI = process.env.MONGODB_URI; // mongodb://localhost:27017/linesdb
 const CLIENT_URL = process.env.CLIENT_URL; // http://localhost:5173
-const V = process.env.VERSION;
+const V = process.env.VERSION; // 1.0.0
 
 
 async function startServer() {

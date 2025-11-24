@@ -8,11 +8,20 @@ import {
 import { 
   handleJoinGame, 
   handleGameDisconnect, 
-  handleMakeMove, 
-  handleGameOver, 
+  handleMakeMove,  
   handleSurrender,
   handleGameChatMessage
 } from './handlers/gameHandler';
+import { 
+  handleJoinGlobalChat, 
+  handleGlobalChatMessage, 
+  handleGlobalDisconnect 
+} from './handlers/globalChatHandler';
+import { 
+  handleJoinLobbyChat, 
+  handleLobbyChatMessage, 
+  handleLeaveLobbyChat 
+} from './handlers/lobbyChatHandler';
 import { handleVideoSignal } from './handlers/videoHandler';
 
 
@@ -34,10 +43,7 @@ export const setupSocketEvents = (io: Server) => {
       socket.on('join-game', (data) => handleJoinGame(socket, data));
     
       // Jogador faz um movimento
-      socket.on('make-move', (data) => handleMakeMove(socket, data));
-      
-      // Notificação de fim de jogo
-      socket.on('game-over', (data) => handleGameOver(socket, data));
+      socket.on('make-move', (data) => handleMakeMove(socket, data));      
       
       // Jogador desiste
       socket.on('surrender', (data) => handleSurrender(socket, data));
@@ -47,6 +53,16 @@ export const setupSocketEvents = (io: Server) => {
 
     // [VIDEO CHAT]
       socket.on('video-signal', (data) => handleVideoSignal(socket, data));
+
+    // [GLOBAL CHAT]
+      socket.on('join-global-chat', (data) => handleJoinGlobalChat(io, socket, data));
+      socket.on('send-global-chat-message', (data) => handleGlobalChatMessage(io, socket, data));
+
+    // [CHAT FILA DE PARTIDAS]
+      // [LOBBY CHAT]
+      socket.on('join-lobby-chat', (data) => handleJoinLobbyChat(socket, data));
+      socket.on('leave-lobby-chat', () => handleLeaveLobbyChat(socket));
+      socket.on('send-lobby-message', (data) => handleLobbyChatMessage(io, socket, data));
 
     // [UTIL]
       // Echo
@@ -62,6 +78,7 @@ export const setupSocketEvents = (io: Server) => {
         console.log(`Cliente desconectado. SocketId: ${socket.id}`);
         handleQueueDisconnect(socket);
         handleGameDisconnect(socket);
+        handleGlobalDisconnect(io, socket);
       });
 
   });

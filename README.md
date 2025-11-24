@@ -6,4 +6,4 @@
 - pm2 start ecosystem.config.js --env development
 
 
-Vai estar ouvindo em: http://localhost:3001/api/v1
+Vai estar ouvindo em: http://localhost:3000/api/v1

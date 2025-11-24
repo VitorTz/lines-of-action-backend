@@ -2,13 +2,20 @@ import { Socket } from 'socket.io';
 import Game from '../../models/Game.model';
 import { getIO } from '../socket';
 import { gameQueue } from '../../GameQueue';
-import game from '../../routes/game';
 import User from '../../models/User.model';
+
+
+const MAX_QUEUE_SIZE = 50;
 
 
 export const handleJoinGameQueue = async (socket: Socket, data: { playerId: string, rank: number }) => {
   try {
     console.log("handleJoinGameQueue", socket.id, data);
+
+    if (gameQueue.size() >= MAX_QUEUE_SIZE) {
+      socket.emit('info', { message: 'A fila está cheia no momento.' });
+      return;
+    }
 
     // Verifica se já está na fila
     if (gameQueue.hasPlayer(data.playerId)) {
@@ -35,7 +42,7 @@ export const handleJoinGameQueue = async (socket: Socket, data: { playerId: stri
       await gameExists.save();
 
       const oponente = await User.findById(gameExists.playerBlack == data.playerId ? gameExists.playerWhite : gameExists.playerBlack);
-      
+
       // Reenvia o match-found para reconectar o jogador
       socket.emit('match-found', {
         gameId: gameExists.id,
@@ -82,7 +89,7 @@ export const handleJoinGameQueue = async (socket: Socket, data: { playerId: stri
       });
 
       const io = getIO();
-      
+
       const whiteUser = await User.findById(match.b.playerId)
       const blackUser = await User.findById(match.a.playerId)
 
@@ -118,7 +125,7 @@ export const handleJoinGameQueue = async (socket: Socket, data: { playerId: stri
 export const handleMatchAccepted = async (socket: Socket, data: { playerId: string, gameId: string }) => {
   try {
     console.log('handleMatchAccepted', data);
-    
+
     const game = await Game.findById(data.gameId);
 
     if (!game) {
@@ -183,10 +190,10 @@ export const handleMatchAccepted = async (socket: Socket, data: { playerId: stri
 export const handleExitQueue = async (socket: Socket, data: { playerId: string }) => {
   try {
     console.log('handleExitQueue:', data);
-    
+
     // Remove o jogador da fila de espera
     const removed = gameQueue.removeByPlayerId(data.playerId);
-    
+
     if (removed) {
       socket.emit('exit-queue');
       console.log(`Jogador ${removed.playerId} saiu da fila`);
@@ -218,7 +225,7 @@ export const handleExitQueue = async (socket: Socket, data: { playerId: string }
     } else {
       socket.emit('exit-queue');
     }
-        
+
   } catch (error) {
     console.error('Erro ao cancelar lobby:', error);
     socket.emit('error', { message: 'Erro ao cancelar' });
@@ -228,7 +235,7 @@ export const handleExitQueue = async (socket: Socket, data: { playerId: string }
 export const handleQueueDisconnect = async (socket: Socket) => {
   try {
     console.log(`Socket ${socket.id} desconectado`);
-    
+
     // Remove da fila se estiver esperando
     const removedFromQueue = gameQueue.removeBySocketId(socket.id);
     if (removedFromQueue) {

@@ -49,3 +49,54 @@ export function formatDateTimeBR(date: Date): string {
 
   return `${d}/${m}/${y} ${h}:${min}:${sec}`;
 }
+
+
+export function arePiecesConnected(board: number[][], piece: number): boolean {
+  const rows = 8;
+  const cols = 8;
+
+  // Lista todas as posições da peça
+  const positions: { r: number; c: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (board[r][c] === piece) {
+        positions.push({ r, c });
+      }
+    }
+  }
+
+  // Se tem 1 ou menos peças, então está conectado
+  if (positions.length <= 1) return true;
+
+  // BFS/DFS para ver se todas estão conectadas
+  const visited = new Set<string>();
+  const queue: { r: number; c: number }[] = [positions[0]];
+  visited.add(`${positions[0].r},${positions[0].c}`);
+
+  const directions = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [0, -1],          [0, 1],
+    [1, -1],  [1, 0], [1, 1],
+  ];
+
+  while (queue.length > 0) {
+    const { r, c } = queue.shift()!;
+
+    for (const [dr, dc] of directions) {
+      const nr = r + dr;
+      const nc = c + dc;
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+
+      if (board[nr][nc] === piece) {
+        const key = `${nr},${nc}`;
+        if (!visited.has(key)) {
+          visited.add(key);
+          queue.push({ r: nr, c: nc });
+        }
+      }
+    }
+  }
+
+  // Conectado se visitou todas as peças
+  return visited.size === positions.length;
+}

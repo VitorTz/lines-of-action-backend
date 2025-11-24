@@ -54,7 +54,7 @@ export interface IGame extends Document {
   playerWhite: IUser['_id'];
   status: 'waiting' | 'active' | 'finished' | 'abandoned';
   turn: 'black' | 'white';  
-  board: number[][]; // 8x8: 0 = Vazio, 1 = Preta, 2 = Branca
+  board: number[][];
   moveHistory: IMove[];
   winner?: IUser['_id'];
   playerBlackSocketId: string
