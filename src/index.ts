@@ -19,6 +19,7 @@ import Game from './models/Game.model';
 
 
 const app = express();
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 const PORT = process.env.PORT; // 3000
 const MONGODB_URI = process.env.MONGODB_URI; // mongodb://localhost:27017/linesdb
