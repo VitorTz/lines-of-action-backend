@@ -17,7 +17,7 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
   });
 
   setupSocketEvents(io)
-  
+
   return io;
 };
 

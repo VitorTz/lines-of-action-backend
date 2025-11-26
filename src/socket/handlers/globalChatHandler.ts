@@ -46,12 +46,9 @@ export const handleJoinGlobalChat = (io: Server, socket: Socket, data: any) => {
 };
 
 export const handleGlobalChatMessage = (io: Server, socket: Socket, data: any) => {
-  // O data deve conter { text, timestamp, userId, username, avatarUrl }
-  // Retransmite a mensagem para todos na sala 'global-chat'
-  
   const messagePayload = {
     ...data,
-    id: `msg_${Date.now()}_${socket.id}`, // Garante um ID único
+    id: `msg_${Date.now()}_${socket.id}`,
   };
 
   io.to('global-chat').emit('global-chat-message', messagePayload);

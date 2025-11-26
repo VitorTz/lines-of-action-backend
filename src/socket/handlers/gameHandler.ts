@@ -3,7 +3,7 @@ import Game, { BLACK, WHITE } from '../../models/Game.model';
 import { getIO } from '../socket';
 import User from '../../models/User.model';
 import { arePiecesConnected } from '../../util';
-import GameChat from '../../models/GameChat.Model';
+
 
 interface MoveData {
   gameId: string;
@@ -246,10 +246,10 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
     game.winner = (game.playerBlack as any).toString() === data.playerId ? game.playerWhite : game.playerBlack;
     game.endedAt = new Date();
     await game.save();
-    
+
     const userWinner = await User.findById(game.winner);
     const userLoser = await User.findById((game.playerBlack as any).toString() === data.playerId ? game.playerBlack : game.playerWhite);
-    
+
     if (userWinner) {
       userWinner.rank = userWinner.rank += 20
       userWinner.save()
@@ -260,7 +260,7 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
       userLoser.save()
     }
 
-    const io = getIO();    
+    const io = getIO();
 
     // Notifica ambos os jogadores
     const gameOverData = {
@@ -300,7 +300,7 @@ export const handleGameChatMessage = async (socket: Socket, data: { gameId: stri
       senderId: data.playerId,
       text: data.message,
       timestamp: Date.now()
-    };    
+    };
 
     // Envia para o oponente
     if (opponentSocketId) {

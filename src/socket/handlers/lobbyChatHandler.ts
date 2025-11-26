@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 
 
-export const handleJoinLobbyChat = (socket: Socket, data: any) => {  
+export const handleJoinLobbyChat = (socket: Socket, data: any) => {
   socket.join('lobby-chat');
   socket.emit('lobby-chat-system-msg', { text: 'Você entrou no chat da fila.' });
 };
@@ -14,7 +14,7 @@ export const handleLeaveLobbyChat = (socket: Socket) => {
 
 export const handleLobbyChatMessage = (io: Server, socket: Socket, data: any) => {
   const { text, username, avatarUrl } = data;
-  
+
   const messagePayload = {
     id: `lmsg_${Date.now()}_${socket.id}`,
     userId: socket.id,
@@ -24,6 +24,6 @@ export const handleLobbyChatMessage = (io: Server, socket: Socket, data: any) =>
     timestamp: Date.now(),
     type: 'message'
   };
-  
+
   io.to('lobby-chat').emit('lobby-chat-message', messagePayload);
 };
