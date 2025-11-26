@@ -30,8 +30,8 @@ export const handleJoinGame = async (socket: Socket, data: { gameId: string, pla
     }
 
     // Verifica se o jogador faz parte do jogo
-    const isBlack = (game.playerBlack as string).toString() === data.playerId;
-    const isWhite = (game.playerWhite as string).toString() === data.playerId;
+    const isBlack = (game.playerBlack as any).toString() === data.playerId;
+    const isWhite = (game.playerWhite as any).toString() === data.playerId;
 
     if (!isBlack && !isWhite) {
       socket.emit('error', { message: 'Você não faz parte desta partida' });
@@ -86,8 +86,8 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
     }
 
     // Verifica se é a vez do jogador
-    const isBlack = (game.playerBlack as string).toString() === data.playerId;
-    const isWhite = (game.playerWhite as string).toString() === data.playerId;
+    const isBlack = (game.playerBlack as any).toString() === data.playerId;
+    const isWhite = (game.playerWhite as any).toString() === data.playerId;
 
     if (!isBlack && !isWhite) {
       socket.emit('error', { message: 'Você não faz parte desta partida' });
@@ -158,15 +158,15 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
       game.save()
 
       const io = getIO()
-      
+
       const winner = await User.findById(game.winner)
       winner!.rank += 20
       winner!.save()
-      
+
       const loser = await User.findById(game.winner == game.playerBlack ? game.playerWhite : game.playerBlack)
       loser!.rank = loser!.rank - 10 >= 0 ? loser!.rank - 10 : 0
       loser!.save()
-      
+
       const gameOverData = {
         winnerUsername: winner!.username,
         gameId: game.id,
@@ -233,8 +233,8 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
       return;
     }
 
-    const isBlack = (game.playerBlack as string).toString() === data.playerId;
-    const isWhite = (game.playerWhite as string).toString() === data.playerId;
+    const isBlack = (game.playerBlack as any).toString() === data.playerId;
+    const isWhite = (game.playerWhite as any).toString() === data.playerId;
 
     if (!isBlack && !isWhite) {
       socket.emit('error', { message: 'Você não faz parte desta partida' });
@@ -243,13 +243,13 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
 
     // Define o vencedor como o oponente
     game.status = 'finished';
-    game.winner = isBlack ? game.playerWhite : game.playerBlack;
+    game.winner = (game.playerBlack as any).toString() === data.playerId ? game.playerWhite : game.playerBlack;
     game.endedAt = new Date();
     await game.save();
-
-    const userWinner = await User.findById(game.winner === 'black' ? game.playerBlack : game.playerWhite);
-    const userLoser = await User.findById(game.winner === 'black' ? game.playerWhite : game.playerBlack);
-
+    
+    const userWinner = await User.findById(game.winner);
+    const userLoser = await User.findById((game.playerBlack as any).toString() === data.playerId ? game.playerBlack : game.playerWhite);
+    
     if (userWinner) {
       userWinner.rank = userWinner.rank += 20
       userWinner.save()
@@ -260,14 +260,12 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
       userLoser.save()
     }
 
-    const io = getIO();
-    const winnerColor = isBlack ? 'white' : 'black';
+    const io = getIO();    
 
     // Notifica ambos os jogadores
     const gameOverData = {
+      winnerUsername: userWinner!.username,
       gameId: game.id,
-      winner: winnerColor,
-      winnerId: game.winner,
       reason: 'surrender'
     };
 
@@ -302,15 +300,7 @@ export const handleGameChatMessage = async (socket: Socket, data: { gameId: stri
       senderId: data.playerId,
       text: data.message,
       timestamp: Date.now()
-    };
-
-    // Salva a mensagem no mongodb
-    await GameChat.create({
-      game: game.id,
-      senderId: data.playerId,
-      senderRole: data.playerId == game.playerBlack ? 'black' : 'white',
-      message: data.message
-    });
+    };    
 
     // Envia para o oponente
     if (opponentSocketId) {

@@ -2,7 +2,6 @@ import { Router, Response, Request } from 'express';
 import Game, { BLACK, WHITE } from '../models/Game.model';
 import { isValidMove, checkEndGame } from '../service/game.logic';
 import { authenticate, AuthRequest } from '../security';
-import GameChat from '../models/GameChat.Model';
 
 
 const game = Router();

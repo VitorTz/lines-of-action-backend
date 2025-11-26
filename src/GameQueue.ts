@@ -39,10 +39,10 @@ class GameQueue {
       }
       return;
     }
-    
+
     this.heap.push(item);
     this.playerSocketMap.set(item.playerId, item.socketId);
-        
+
     let i = this.heap.length - 1;
     while (i > 0) {
       const p = Math.floor((i - 1) / 2);
@@ -68,16 +68,16 @@ class GameQueue {
       this.playerSocketMap.delete(top.playerId);
       return top;
     }
-    
+
     const top = this.heap[0];
     this.heap[0] = this.heap.pop()!;
-        
+
     let i = 0;
     while (true) {
       let left = 2 * i + 1;
       let right = 2 * i + 2;
       let smallest = i;
-      
+
       if (left < this.heap.length && this.compare(this.heap[left], this.heap[smallest]) < 0) {
         smallest = left;
       }
@@ -85,11 +85,11 @@ class GameQueue {
         smallest = right;
       }
       if (smallest === i) break;
-      
+
       this.swap(i, smallest);
       i = smallest;
     }
-    
+
     this.playerSocketMap.delete(top.playerId);
     return top;
   }
@@ -100,29 +100,29 @@ class GameQueue {
     }
 
     const index = this.heap.findIndex(item => item.playerId === playerId);
-    
+
     if (index === -1) {
       this.playerSocketMap.delete(playerId);
       return null;
     }
-    
+
     const removed = this.heap[index];
-        
+
     if (index === this.heap.length - 1) {
       this.heap.pop();
       this.playerSocketMap.delete(removed.playerId);
       return removed;
     }
-        
+
     this.heap[index] = this.heap.pop()!;
-        
+
     this.heapify(index);
     this.playerSocketMap.delete(removed.playerId);
-    
+
     return removed;
   }
 
-  private findPlayerBySocketId(socketId: string): string | null { 
+  private findPlayerBySocketId(socketId: string): string | null {
     for (const [playerId, socket] of this.playerSocketMap.entries()) {
       if (socket === socketId) {
         return playerId;
@@ -139,7 +139,7 @@ class GameQueue {
 
   private heapify(index: number): void {
     const n = this.heap.length;
-        
+
     let current = index;
     while (current > 0) {
       const parent = Math.floor((current - 1) / 2);
@@ -147,14 +147,14 @@ class GameQueue {
       this.swap(current, parent);
       current = parent;
     }
-        
+
     if (current !== index) return;
-        
+
     while (true) {
       let left = 2 * current + 1;
       let right = 2 * current + 2;
       let smallest = current;
-      
+
       if (left < n && this.compare(this.heap[left], this.heap[smallest]) < 0) {
         smallest = left;
       }
@@ -162,25 +162,25 @@ class GameQueue {
         smallest = right;
       }
       if (smallest === current) break;
-      
+
       this.swap(current, smallest);
       current = smallest;
     }
   }
 
-  match(): {a: QueueItem, b: QueueItem} | null {
+  match(): { a: QueueItem, b: QueueItem } | null {
     if (this.heap.length < 2) return null;
 
     const a = this.removeTop();
     if (!a) return null;
 
     let b = this.removeTop();
-    
+
     // Garante que não está fazendo match do mesmo jogador consigo mesmo
     while (b && b.playerId === a.playerId) {
       b = this.removeTop();
     }
-    
+
     if (!b) {
       // Não há outro jogador, reinsere o primeiro
       this.insert(a);
@@ -192,7 +192,7 @@ class GameQueue {
     console.log(`Player B: ${b.playerId} (Rank: ${b.rank})`);
     console.log(`===================================`);
 
-    return {a, b};
+    return { a, b };
   }
 
   size(): number {
