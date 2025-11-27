@@ -29,6 +29,10 @@ export const handleJoinGame = async (socket: Socket, data: { gameId: string, pla
       return;
     }
 
+    // Cria uma sala com o gameId. Comunicação do jogo pelos sockets será feita através da sala
+    // Se o socket cair e voltar, ele sempre vai entrar na sala correta do jogo
+    socket.join(data.gameId);
+
     // Verifica se o jogador faz parte do jogo
     const isBlack = (game.playerBlack as any).toString() === data.playerId;
     const isWhite = (game.playerWhite as any).toString() === data.playerId;
@@ -94,11 +98,23 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
       return;
     }
 
+    // Atualiza o id dos sockets dos jogadores
+    if (isBlack) {
+      game.playerBlackSocketId = socket.id
+    } else {
+      game.playerWhiteSocketId = socket.id
+    }
+
     const playerColor = isBlack ? 'black' : 'white';
     if (game.turn !== playerColor) {
       socket.emit('error', { message: 'Não é sua vez de jogar' });
       return;
     }
+
+    // Força o socket a entrar na sala do jogo (não faz nada se já estiver)
+    socket.join(data.gameId)
+
+    // TODO: Verificar se é um movimento válido
 
     // Atualiza o tabuleiro
     const newBoard = game.board.map(row => [...row]);
@@ -118,11 +134,8 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
     // Atualiza tabuleiro e turno
     game.board = newBoard;
     game.turn = playerColor === 'black' ? 'white' : 'black';
-    await game.save();
+    await game.save();    
 
-    const io = getIO();
-
-    // Notifica ambos os jogadores sobre o movimento
     const moveData = {
       gameId: game.id,
       from: data.from,
@@ -130,16 +143,17 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
       captured: data.captured,
       player: playerColor,
       board: newBoard,
+      playerId: data.playerId,
       turn: game.turn
     };
 
-    io.to(game.playerBlackSocketId).emit('move-made', moveData);
-    io.to(game.playerWhiteSocketId).emit('move-made', moveData);
+    // Notifica os jogadores na sala sobre o movimento
+    const io = getIO()
+    io.to(data.gameId).emit('move-made', moveData);
 
-    console.log(
-      `Movimento realizado no jogo ${data.gameId}: ${playerColor} de (${data.from.row},${data.from.col}) para (${data.to.row},${data.to.col})`
-    );
+    console.log(`Movimento realizado no jogo ${data.gameId}: ${playerColor} (${data.from.row},${data.from.col}) -> (${data.to.row},${data.to.col})`);
 
+    // Verifica game over
     const areBlackPiecesConnected = arePiecesConnected(newBoard, BLACK)
     const areWhitePiecesConnected = arePiecesConnected(newBoard, WHITE)
 
@@ -155,17 +169,19 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
     if (game.winner) {
       game.status = 'finished'
       game.endedAt = new Date()
-      game.save()
-
-      const io = getIO()
+      game.save()      
 
       const winner = await User.findById(game.winner)
-      winner!.rank += 20
-      winner!.save()
+      if (winner) {
+        winner.rank += 20
+        winner.save()
+      }
 
       const loser = await User.findById(game.winner == game.playerBlack ? game.playerWhite : game.playerBlack)
-      loser!.rank = loser!.rank - 10 >= 0 ? loser!.rank - 10 : 0
-      loser!.save()
+      if (loser) {
+        loser.rank = loser!.rank - 10 >= 0 ? loser!.rank - 10 : 0
+        loser.save()
+      }
 
       const gameOverData = {
         winnerUsername: winner!.username,
@@ -173,10 +189,8 @@ export const handleMakeMove = async (socket: Socket, data: MoveData) => {
         reason: 'connect'
       };
 
-      io.to(game.playerBlackSocketId).emit('game-over', gameOverData);
-      io.to(game.playerWhiteSocketId).emit('game-over', gameOverData);
+      io.to(data.gameId).emit('game-over', gameOverData);
       console.log(`Jogo ${data.gameId} finalizado. Vencedor: ${game.winner}`);
-
     }
   } catch (error) {
     console.error('Erro ao fazer movimento:', error);
@@ -200,14 +214,10 @@ export const handleGameDisconnect = async (socket: Socket) => {
 
     if (game) {
       const io = getIO();
-      const isBlack = socket.id === game.playerBlackSocketId;
-      const opponentSocketId = isBlack ? game.playerWhiteSocketId : game.playerBlackSocketId;
-
-      // Notifica o oponente sobre a desconexão
-      io.to(opponentSocketId).emit('opponent-disconnected-game', {
+      io.to(game.id).emit('opponent-disconnected-game', {
         message: 'Seu oponente se desconectou',
         gameId: game.id
-      });
+      });      
 
       console.log(`Jogador desconectado do jogo ${game._id}`);
     }
@@ -241,6 +251,8 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
       return;
     }
 
+    socket.join(data.gameId)
+
     // Define o vencedor como o oponente
     game.status = 'finished';
     game.winner = (game.playerBlack as any).toString() === data.playerId ? game.playerWhite : game.playerBlack;
@@ -260,18 +272,15 @@ export const handleSurrender = async (socket: Socket, data: { gameId: string, pl
       userLoser.save()
     }
 
-    const io = getIO();
-
-    // Notifica ambos os jogadores
     const gameOverData = {
       winnerUsername: userWinner!.username,
       gameId: game.id,
       reason: 'surrender'
     };
-
-    io.to(game.playerBlackSocketId).emit('game-over', gameOverData);
-    io.to(game.playerWhiteSocketId).emit('game-over', gameOverData);
-
+    
+    // Notifica ambos os jogadores
+    const io = getIO()
+    io.to(data.gameId).emit('game-over', gameOverData);    
     console.log(`Jogo ${data.gameId} finalizado por desistência`);
   } catch (error) {
     console.error('Erro ao desistir:', error);
@@ -284,17 +293,12 @@ export const handleGameChatMessage = async (socket: Socket, data: { gameId: stri
   try {
     const game = await Game.findById(data.gameId);
 
-    if (!game) return;
-
-    const io = getIO();
-    let opponentSocketId: string | null = null;
-
-    // Identifica quem mandou e quem deve receber
-    if (socket.id === game.playerBlackSocketId) {
-      opponentSocketId = game.playerWhiteSocketId;
-    } else if (socket.id === game.playerWhiteSocketId) {
-      opponentSocketId = game.playerBlackSocketId;
+    if (!game) {
+      socket.emit('error', { message: 'Jogo não encotrado' });
+      return;
     }
+
+    socket.join(data.gameId)
 
     const messageData = {
       senderId: data.playerId,
@@ -302,14 +306,9 @@ export const handleGameChatMessage = async (socket: Socket, data: { gameId: stri
       timestamp: Date.now()
     };
 
-    // Envia para o oponente
-    if (opponentSocketId) {
-      io.to(opponentSocketId).emit('game-chat-message', messageData);
-    }
-
-    // Envia de volta para quem mandou (confirmação/echo) para garantir sincronia
-    socket.emit('game-chat-message', messageData);
-
+    // Envia para as pessoas na sala
+    const io = getIO()
+    io.to(data.gameId).emit('game-chat-message', messageData)
   } catch (error) {
     console.error('Erro no chat do jogo:', error);
   }
